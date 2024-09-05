@@ -915,7 +915,7 @@ class AsyncClient(Client):
         homeserver: Optional[str] = None,
     ) -> Optional[str]:
         """Convert a matrix content URI to a HTTP URI."""
-        return Api.mxc_to_http(mxc, homeserver or self.homeserver)
+        return Api.mxc_to_http(mxc, self.access_token, homeserver or self.homeserver)
 
     async def login_raw(
         self, auth_dict: Dict[str, Any]
@@ -3253,6 +3253,7 @@ class AsyncClient(Client):
         http_method, path = Api.download(
             server_name,
             media_id,
+            self.access_token,
             filename,
             allow_remote,
         )
@@ -3301,7 +3302,7 @@ class AsyncClient(Client):
                 itself.
         """
         http_method, path = Api.thumbnail(
-            server_name, media_id, width, height, method, allow_remote
+            server_name, media_id, width, height, self.access_token, method, allow_remote
         )
 
         return await self._send(

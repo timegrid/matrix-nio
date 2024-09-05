@@ -627,7 +627,7 @@ class HttpClient(Client):
                 itself.
         """
         request = self._build_request(
-            Api.download(server_name, media_id, filename, allow_remote)
+            Api.download(server_name, media_id, self.access_token, filename, allow_remote)
         )
 
         return self._send(request, RequestInfo(DownloadResponse))
@@ -661,7 +661,7 @@ class HttpClient(Client):
                 itself.
         """
         request = self._build_request(
-            Api.thumbnail(server_name, media_id, width, height, method, allow_remote)
+            Api.thumbnail(server_name, media_id, width, height, self.access_token, method, allow_remote)
         )
 
         return self._send(request, RequestInfo(ThumbnailResponse))

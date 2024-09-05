@@ -54,7 +54,6 @@ except ImportError:
 
 MATRIX_API_PATH_V1: str = "/_matrix/client/v1"
 MATRIX_API_PATH_V3: str = "/_matrix/client/v3"
-MATRIX_MEDIA_API_PATH: str = "/_matrix/media/v3"
 
 _FilterT = Union[None, str, Dict[Any, Any]]
 
@@ -193,7 +192,9 @@ class Api:
         return "m.file"
 
     @staticmethod
-    def mxc_to_http(mxc: str, homeserver: Optional[str] = None) -> Optional[str]:
+    def mxc_to_http(
+            mxc: str, access_token: Optional[str], homeserver: Optional[str] = None
+    ) -> Optional[str]:
         """Convert a matrix content URI to a HTTP URI."""
         url = urlparse(mxc)
 
@@ -206,7 +207,7 @@ class Api:
         parsed_homeserver = urlparse(homeserver) if homeserver else None
 
         http_url = (
-            f"{homeserver}{MATRIX_MEDIA_API_PATH}/download/" "{server_name}{mediaId}"
+            f"{homeserver}{MATRIX_API_PATH_V1}/media/download/" "{server_name}{mediaId}"
         ).format(
             homeserver=(
                 parsed_homeserver.geturl()
@@ -217,6 +218,13 @@ class Api:
             mediaId=url.path,
         )
 
+        query_parameters = {}
+        if access_token:
+            query_parameters["access_token"] = access_token
+
+        if query_parameters:
+            http_url += f"?{urlencode(query_parameters)}"
+
         return http_url
 
     @staticmethod
@@ -225,6 +233,7 @@ class Api:
         key: str,
         hash: str,
         iv: str,
+        access_token: Optional[str],
         homeserver: Optional[str] = None,
         mimetype: Optional[str] = None,
     ) -> Optional[str]:
@@ -248,6 +257,7 @@ class Api:
                 payload the URI is pointing to.
             hash (str): The hash of the payload.
             iv (str): The initial value needed to decrypt the payload.
+            access_token (str): The access token to be used with the request.
             mimetype (str): The mimetype of the payload.
         """
         url = urlparse(mxc)
@@ -267,7 +277,7 @@ class Api:
         )
 
         plumb_url = (
-            f"{homeserver}{MATRIX_MEDIA_API_PATH}/download/" "{server_name}{mediaId}"
+            f"{homeserver}{MATRIX_API_PATH_V1}/media/download/" "{server_name}{mediaId}"
         ).format(
             homeserver=host or f"emxc://{url.netloc}",
             server_name=url.hostname,
@@ -281,6 +291,8 @@ class Api:
         }
         if mimetype is not None:
             query_parameters["mimetype"] = mimetype
+        if access_token:
+            query_parameters["access_token"] = access_token
 
         plumb_url += f"?{urlencode(query_parameters)}"
 
@@ -1565,9 +1577,9 @@ class Api:
             access_token (str): The access token to be used with the request.
         """
         query_parameters = {"access_token": access_token}
-        path = ["config"]
+        path = ["media", "config"]
 
-        return "GET", Api._build_path(path, query_parameters, MATRIX_MEDIA_API_PATH)
+        return "GET", Api._build_path(path, query_parameters, MATRIX_API_PATH_V1)
 
     @staticmethod
     def upload(
@@ -1587,17 +1599,18 @@ class Api:
             filename (str): The name of the file being uploaded
         """
         query_parameters = {"access_token": access_token}
-        path = ["upload"]
+        path = ["media", "upload"]
 
         if filename:
             query_parameters["filename"] = filename
 
-        return "POST", Api._build_path(path, query_parameters, MATRIX_MEDIA_API_PATH)
+        return "POST", Api._build_path(path, query_parameters, MATRIX_API_PATH_V1)
 
     @staticmethod
     def download(
         server_name: str,
         media_id: str,
+        access_token: str,
         filename: Optional[str] = None,
         allow_remote: bool = True,
         file: Optional[os.PathLike] = None,
@@ -1609,6 +1622,7 @@ class Api:
         Args:
             server_name (str): The server name from the mxc:// URI.
             media_id (str): The media ID from the mxc:// URI.
+            access_token (str): The access token to be used with the request.
             filename (str, optional): A filename to be returned in the response
                 by the server. If None (default), the original name of the
                 file will be returned instead, if there is one.
@@ -1619,14 +1633,15 @@ class Api:
             file (os.PathLike): The file to stream the downloaded content to.
         """
         query_parameters = {
+            "access_token": access_token,
             "allow_remote": "true" if allow_remote else "false",
         }
         end = ""
         if filename:
             end = filename
-        path = ["download", server_name, media_id, end]
+        path = ["media", "download", server_name, media_id, end]
 
-        return "GET", Api._build_path(path, query_parameters, MATRIX_MEDIA_API_PATH)
+        return "GET", Api._build_path(path, query_parameters, MATRIX_API_PATH_V1)
 
     @staticmethod
     def thumbnail(
@@ -1634,6 +1649,7 @@ class Api:
         media_id: str,
         width: int,
         height: int,
+        access_token: str,
         method: ResizingMethod = ResizingMethod.scale,
         allow_remote: bool = True,
     ) -> Tuple[str, str]:
@@ -1648,6 +1664,7 @@ class Api:
             media_id (str): The media ID from the mxc:// URI.
             width (int): The desired width of the thumbnail.
             height (int): The desired height of the thumbnail.
+            access_token (str): The access token to be used with the request.
             method (ResizingMethod): The desired resizing method.
             allow_remote (bool): Indicates to the server that it should not
                 attempt to fetch the media if it is deemed remote.
@@ -1658,11 +1675,12 @@ class Api:
             "width": width,
             "height": height,
             "method": method.value,
+            "access_token": access_token,
             "allow_remote": "true" if allow_remote else "false",
         }
-        path = ["thumbnail", server_name, media_id]
+        path = ["media", "thumbnail", server_name, media_id]
 
-        return "GET", Api._build_path(path, query_parameters, MATRIX_MEDIA_API_PATH)
+        return "GET", Api._build_path(path, query_parameters, MATRIX_API_PATH_V1)
 
     @staticmethod
     def profile_get(

@@ -131,7 +131,6 @@ from nio import (
 from nio.api import (
     MATRIX_API_PATH_V1,
     MATRIX_API_PATH_V3,
-    MATRIX_MEDIA_API_PATH,
     EventFormat,
     RelationshipType,
     ResizingMethod,
@@ -145,7 +144,7 @@ from nio.responses import PublicRoom, PublicRoomsResponse
 
 BASE_URL_V1 = f"https://example.org{MATRIX_API_PATH_V1}"
 BASE_URL_V3 = f"https://example.org{MATRIX_API_PATH_V3}"
-BASE_MEDIA_URL = f"https://example.org{MATRIX_MEDIA_API_PATH}"
+BASE_MEDIA_URL = f"https://example.org{MATRIX_API_PATH_V1}/media"
 TEST_ROOM_ID = "!testroom:example.org"
 
 ALICE_ID = "@alice:example.org"
@@ -413,9 +412,9 @@ class TestClass:
     def list_public_rooms_response(self):
         return self._load_response("tests/data/list_public_rooms.json")
 
-    async def test_mxc_to_http(self, unauthed_async_client):
+    async def test_mxc_to_http_unauthed(self, unauthed_async_client):
         mxc = "mxc://privacytools.io/123foo"
-        url_path = f"{MATRIX_MEDIA_API_PATH}/download/privacytools.io/123foo"
+        url_path = f"{MATRIX_API_PATH_V1}/media/download/privacytools.io/123foo"
 
         unauthed_async_client.homeserver = "https://chat.privacytools.io"
         expected = f"{unauthed_async_client.homeserver}{url_path}"
@@ -424,6 +423,18 @@ class TestClass:
         other_server = "http://localhost:8081"
         expected = f"{other_server}{url_path}"
         assert await unauthed_async_client.mxc_to_http(mxc, other_server) == expected
+
+    async def test_mxc_to_http_authed(self, async_client: AsyncClient):
+        mxc = "mxc://privacytools.io/123foo"
+        url_path = f"{MATRIX_API_PATH_V1}/media/download/privacytools.io/123foo"
+
+        async_client.homeserver = "https://chat.privacytools.io"
+        expected = f"{async_client.homeserver}{url_path}?access_token=abc123"
+        assert await async_client.mxc_to_http(mxc) == expected
+
+        other_server = "http://localhost:8081"
+        expected = f"{other_server}{url_path}?access_token=abc123"
+        assert await async_client.mxc_to_http(mxc, other_server) == expected
 
     async def test_register(self, unauthed_async_client, aioresponse):
         assert not unauthed_async_client.access_token
@@ -2284,7 +2295,7 @@ class TestClass:
         server_name, media_id = _extract_parts(mxc)
 
         aioresponse.get(
-            f"{BASE_MEDIA_URL}/download/{server_name}/{media_id}?allow_remote=true",
+            f"{BASE_MEDIA_URL}/download/{server_name}/{media_id}?access_token=abc123&allow_remote=true",
             status=200,
             content_type="image/png",
             body=self.file_response,
@@ -2295,7 +2306,7 @@ class TestClass:
         assert resp.filename is None
 
         aioresponse.get(
-            f"{BASE_MEDIA_URL}/download/{server_name}/{media_id}/{filename}?allow_remote=true",
+            f"{BASE_MEDIA_URL}/download/{server_name}/{media_id}/{filename}?access_token=abc123&allow_remote=true",
             status=200,
             content_type="image/png",
             headers={"content-disposition": f'inline; filename="{filename}"'},
@@ -2308,7 +2319,7 @@ class TestClass:
 
         async_client.config = AsyncClientConfig(max_limit_exceeded=0)
         aioresponse.get(
-            f"{BASE_MEDIA_URL}/download/{server_name}/{media_id}?allow_remote=true",
+            f"{BASE_MEDIA_URL}/download/{server_name}/{media_id}?access_token=abc123&allow_remote=true",
             status=429,
             content_type="application/json",
             body=b'{"errcode": "M_LIMIT_EXCEEDED", "retry_after_ms": 1}',
@@ -2326,7 +2337,7 @@ class TestClass:
 
         aioresponse.get(
             f"{BASE_MEDIA_URL}/thumbnail/{server_name}/{media_id}"
-            f"?width={width}&height={height}&method={method.value}&allow_remote=true",
+            f"?width={width}&height={height}&access_token=abc123&method={method.value}&allow_remote=true",
             status=200,
             content_type="image/png",
             body=self.file_response,
@@ -2341,7 +2352,7 @@ class TestClass:
 
         aioresponse.get(
             f"{BASE_MEDIA_URL}/thumbnail/{server_name}/{media_id}"
-            f"?width={width}&height={height}&method={method.value}&allow_remote=true",
+            f"?width={width}&height={height}&access_token=abc123&method={method.value}&allow_remote=true",
             status=429,
             content_type="application/json",
             body=b'{"errcode": "M_LIMIT_EXCEEDED", "retry_after_ms": 1}',
